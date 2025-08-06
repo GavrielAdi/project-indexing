@@ -42,7 +42,7 @@ Sebelum memulai, pastikan Anda telah menginstal:
 
 1.  **Clone repository ini:**
     ```bash
-    git clone [Link]
+    git clone https://github.com/GavrielAdi/project-indexing.git
     cd project-indexing
     ```
 
