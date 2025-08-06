@@ -1,0 +1,50 @@
+# ======================================================================
+# File Umum & Sistem Operasi
+# ======================================================================
+# File metadata macOS
+.DS_Store
+
+# File cache thumbnail Windows
+Thumbs.db
+
+# File log, swap, dan backup editor
+*.log
+*.swo
+*.swp
+
+# ======================================================================
+# Python / Backend
+# File-file ini biasanya berada di dalam folder 'backend/'
+# ======================================================================
+
+# Folder Virtual Environment (SANGAT PENTING)
+# Ini berisi ribuan file library yang tidak perlu disimpan di Git.
+backend/venv/
+
+# Folder cache Python
+backend/__pycache__/
+backend/*.pyc
+
+# File Environment (SANGAT PENTING UNTUK KEAMANAN)
+# File ini berisi MONGO_URI Anda yang rahasia.
+backend/.env
+
+# File database SQLite jika Anda membuatnya saat testing
+# backend/dokumen.db
+
+# ======================================================================
+# Node.js / Frontend
+# File-file ini biasanya berada di dalam folder 'frontend/'
+# ======================================================================
+
+# Folder dependensi (SANGAT PENTING)
+# Ini berisi ratusan ribu file library.
+frontend/node_modules/
+
+# Folder build dan cache Next.js
+frontend/.next/
+
+# ======================================================================
+# Editor & IDE (Contoh untuk VS Code)
+# ======================================================================
+.vscode/
