@@ -22,14 +22,23 @@ export default function HomePage() {
   const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
+  const API_URL = 'http://127.0.0.1:5000';
 
   const fetchDocuments = async () => {
     try {
-      const response = await fetch(`${API_URL}/documents`);
+      // --- PERBAIKAN DI SINI: Tambahkan { cache: 'no-store' } ---
+      const response = await fetch(`${API_URL}/documents`, { cache: 'no-store' });
       const data = await response.json();
-      if (response.ok) setDocuments(data);
-    } catch (err) { console.error("Error saat fetch riwayat:", err); }
+      if (response.ok) {
+        setDocuments(data);
+      } else {
+        console.error("Gagal mengambil riwayat:", data.error);
+        setDocuments([]); // Set ke array kosong jika gagal
+      }
+    } catch (err) { 
+      console.error("Error saat fetch riwayat:", err);
+      setDocuments([]); // Set ke array kosong jika ada error koneksi
+    }
   };
 
   const handleSwitchDocument = async (docId: string) => {
@@ -41,11 +50,9 @@ export default function HomePage() {
       if (response.ok) {
         setIndexedFile(data.filename);
         setActiveDocumentId(docId);
-        // --- SIMPAN PILIHAN KE LOCALSTORAGE ---
         localStorage.setItem(LOCAL_STORAGE_KEY, docId);
       } else {
         console.error("Gagal switch dokumen:", data.error);
-        // Jika gagal (misal file sudah dihapus), hapus dari localStorage
         localStorage.removeItem(LOCAL_STORAGE_KEY);
       }
     } catch (err) { console.error("Error saat switch dokumen:", err); }
@@ -57,14 +64,11 @@ export default function HomePage() {
       setIsLoading(true);
       await fetchDocuments();
       
-      // --- LOGIKA STARTUP BARU ---
       const lastActiveId = localStorage.getItem(LOCAL_STORAGE_KEY);
 
       if (lastActiveId) {
-        // Prioritas 1: Muat dokumen yang diingat
         await handleSwitchDocument(lastActiveId);
       } else {
-        // Prioritas 2: Jika tidak ada, muat yang terbaru
         try {
           const latestDocResponse = await fetch(`${API_URL}/document/latest`);
           const latestDocData = await latestDocResponse.json();
@@ -96,7 +100,6 @@ export default function HomePage() {
   const resetActiveFile = () => {
     setIndexedFile("Tidak ada dokumen yang dipilih.");
     setActiveDocumentId(null);
-    // --- HAPUS DARI LOCALSTORAGE ---
     localStorage.removeItem(LOCAL_STORAGE_KEY);
   };
 

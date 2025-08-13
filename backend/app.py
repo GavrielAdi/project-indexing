@@ -214,7 +214,7 @@ def upload_file_to_db():
         'gridfs_id': gridfs_id,
         'filename': filename,
         'upload_date': datetime.now(),
-        'index_data': index_data_dict # Simpan sebagai dictionary
+        'index_data': index_data_dict
     })
     
     return jsonify({'message': f'File {filename} berhasil disimpan ke database dan di-indeks.'}), 201
@@ -222,7 +222,8 @@ def upload_file_to_db():
 @app.route('/documents', methods=['GET'])
 def get_documents_from_db():
     try:
-        documents = file_metadata_collection.find({}, {"filename": 1, "upload_date": 1}).sort("upload_date", -1)
+        documents = list(file_metadata_collection.find({}, {"filename": 1, "upload_date": 1}).sort("upload_date", -1))
+        print(f"DEBUG: Ditemukan {len(documents)} dokumen di database.")
         doc_list = [{'id': str(doc['_id']), 'filename': doc['filename'], 'upload_date': doc['upload_date'].strftime("%Y-%m-%d %H:%M:%S")} for doc in documents]
         return jsonify(doc_list)
     except Exception as e:
@@ -234,17 +235,12 @@ def switch_document(doc_id):
     global pos_index, trie_index, current_indexed_file
     try:
         obj_id = ObjectId(doc_id)
-    except (InvalidId, TypeError):
-        return jsonify({'error': 'Format ID dokumen tidak valid.'}), 400
-        
-    try:
         doc_metadata = file_metadata_collection.find_one({'_id': obj_id})
         if not doc_metadata:
             return jsonify({'error': 'Dokumen tidak ditemukan'}), 404
         
         index_data = doc_metadata['index_data']
         pos_index = PositionalIndex.from_dict(index_data)
-        # Bangun ulang Trie dari daftar kata yang aman
         trie_index = Trie()
         trie_index.build(set(pos_index.dokumen))
         
@@ -252,6 +248,8 @@ def switch_document(doc_id):
         
         print(f"--- Berpindah ke dokumen aktif: {current_indexed_file} ---")
         return jsonify({'message': f'Berhasil beralih ke {current_indexed_file}', 'filename': current_indexed_file})
+    except (InvalidId, TypeError):
+        return jsonify({'error': 'Format ID dokumen tidak valid.'}), 400
     except Exception as e:
         app.logger.error(f"Switch document error: {e}")
         return jsonify({'error': 'Gagal beralih dokumen.'}), 500
@@ -290,10 +288,6 @@ def delete_document(doc_id):
     global current_indexed_file, pos_index, trie_index
     try:
         obj_id = ObjectId(doc_id)
-    except (InvalidId, TypeError):
-        return jsonify({'error': 'Format ID dokumen tidak valid.'}), 400
-
-    try:
         doc_metadata = file_metadata_collection.find_one({'_id': obj_id})
         if not doc_metadata:
             return jsonify({'error': 'Dokumen tidak ditemukan'}), 404
@@ -310,23 +304,21 @@ def delete_document(doc_id):
             trie_index = Trie()
 
         return jsonify({'message': f'Dokumen {filename_to_delete} berhasil dihapus.'}), 200
+    except (InvalidId, TypeError):
+        return jsonify({'error': 'Format ID dokumen tidak valid.'}), 400
     except Exception as e:
         app.logger.error(f"Delete document error: {e}")
         return jsonify({'error': 'Gagal menghapus dokumen.'}), 500
 
-# ======================================================================
-# BAGIAN 5: ERROR HANDLER
-# ======================================================================
 @app.errorhandler(500)
 def internal_server_error(e):
-    # Log error lengkap untuk debugging di sisi server
     app.logger.error(f"Internal Server Error: {e}", exc_info=True)
-    # Kirim respons JSON yang generik ke klien
     return jsonify(error="Terjadi kesalahan internal pada server. Silakan cek log."), 500
 
 # ======================================================================
-# BAGIAN 6: MENJALANKAN APLIKASI
+# BAGIAN 5: MENJALANKAN APLIKASI
 # ======================================================================
 if __name__ == '__main__':
     print("--- Server dimulai, siap menerima koneksi ---")
+    # Gunakan host='0.0.0.0' agar bisa diakses via Ngrok
     app.run(host='0.0.0.0', port=5000)
