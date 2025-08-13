@@ -28,7 +28,7 @@ export default function SearchPage({ indexedFile, isLoading, setIsLoading, docum
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
 
-  const API_URL = 'http://127.0.0.1:5000';
+  const API_URL = 'https://caribou-eager-lab.ngrok-free.app';
 
   // Handler pencarian tidak berubah
   const handleSearch = async (e: React.FormEvent) => {

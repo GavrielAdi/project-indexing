@@ -22,7 +22,7 @@ export default function HomePage() {
   const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const API_URL = 'http://127.0.0.1:5000';
+  const API_URL = 'https://caribou-eager-lab.ngrok-free.app';
 
   const fetchDocuments = async () => {
     try {

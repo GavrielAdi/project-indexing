@@ -22,7 +22,7 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
   const [uploadMessage, setUploadMessage] = useState('');
   const [isUploading, setIsUploading] = useState(false);
 
-  const API_URL = 'http://127.0.0.1:5000';
+  const API_URL = 'https://caribou-eager-lab.ngrok-free.app';
 
   // Handler upload sekarang memanggil fetchDocuments dari props
   const handleFileUpload = async (e: React.FormEvent) => {
