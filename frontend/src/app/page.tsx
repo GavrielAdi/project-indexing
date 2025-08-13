@@ -22,23 +22,35 @@ export default function HomePage() {
   const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Menggunakan environment variable, ini sudah benar.
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
 
   const fetchDocuments = async () => {
     try {
-      // --- PERBAIKAN DI SINI: Memaksa request baru & tidak menggunakan cache ---
       const response = await fetch(`${API_URL}/documents`, { cache: 'no-store' });
-      const data = await response.json();
-      if (response.ok) {
-        setDocuments(data);
+
+      // --- PERBAIKAN DEBUGGING DI SINI ---
+      // Cek dulu apakah responsnya benar-benar JSON sebelum di-parse
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        // Jika ini JSON, lanjutkan seperti biasa
+        const data = await response.json();
+        if (response.ok) {
+          setDocuments(data);
+        } else {
+          console.error("Gagal mengambil riwayat (respons JSON error):", data.error);
+          setDocuments([]);
+        }
       } else {
-        console.error("Gagal mengambil riwayat:", data.error);
-        setDocuments([]); // Pastikan daftar kosong jika ada error
+        // Jika BUKAN JSON, ini pasti halaman error HTML. Mari kita tampilkan.
+        const textResponse = await response.text();
+        console.error("--- KESALAHAN KRITIS: Backend tidak mengirim JSON! ---");
+        console.error("Ini adalah respons HTML yang sebenarnya diterima dari backend:");
+        console.log(textResponse); // Tampilkan HTML error di console
+        throw new Error("Backend response was not JSON.");
       }
     } catch (err) { 
-      console.error("Error koneksi saat fetch riwayat:", err);
-      setDocuments([]); // Pastikan daftar kosong jika koneksi gagal
+      console.error("Error koneksi atau parsing saat fetch riwayat:", err);
+      setDocuments([]);
     }
   };
 
@@ -71,7 +83,6 @@ export default function HomePage() {
         await handleSwitchDocument(lastActiveId);
       } else {
         try {
-          // --- PERBAIKAN DI SINI: Memaksa request baru & tidak menggunakan cache ---
           const latestDocResponse = await fetch(`${API_URL}/document/latest`, { cache: 'no-store' });
           const latestDocData = await latestDocResponse.json();
           if (latestDocResponse.ok && latestDocData.id) {
