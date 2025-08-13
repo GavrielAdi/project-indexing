@@ -24,15 +24,21 @@ export default function HomePage() {
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
 
+  // --- OPSI HEADER BARU UNTUK NGROK ---
+  const ngrokSkipHeader = {
+    'ngrok-skip-browser-warning': 'true',
+  };
+
   const fetchDocuments = async () => {
     try {
-      const response = await fetch(`${API_URL}/documents`, { cache: 'no-store' });
+      // Menambahkan header ke fetch
+      const response = await fetch(`${API_URL}/documents`, { 
+        cache: 'no-store',
+        headers: ngrokSkipHeader 
+      });
 
-      // --- PERBAIKAN DEBUGGING DI SINI ---
-      // Cek dulu apakah responsnya benar-benar JSON sebelum di-parse
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.indexOf("application/json") !== -1) {
-        // Jika ini JSON, lanjutkan seperti biasa
         const data = await response.json();
         if (response.ok) {
           setDocuments(data);
@@ -41,11 +47,9 @@ export default function HomePage() {
           setDocuments([]);
         }
       } else {
-        // Jika BUKAN JSON, ini pasti halaman error HTML. Mari kita tampilkan.
         const textResponse = await response.text();
-        console.error("--- KESALAHAN KRITIS: Backend tidak mengirim JSON! ---");
-        console.error("Ini adalah respons HTML yang sebenarnya diterima dari backend:");
-        console.log(textResponse); // Tampilkan HTML error di console
+        console.error("--- KESALAHAN KRITIS: Backend tidak mengirim JSON! (Kemungkinan dari Ngrok) ---");
+        console.error("Ini adalah respons HTML yang diterima:", textResponse);
         throw new Error("Backend response was not JSON.");
       }
     } catch (err) { 
@@ -58,7 +62,11 @@ export default function HomePage() {
     if (!docId) return;
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/switch_document/${docId}`, { method: 'POST' });
+      // Menambahkan header ke fetch
+      const response = await fetch(`${API_URL}/switch_document/${docId}`, { 
+        method: 'POST',
+        headers: ngrokSkipHeader
+      });
       const data = await response.json();
       if (response.ok) {
         setIndexedFile(data.filename);
@@ -83,7 +91,11 @@ export default function HomePage() {
         await handleSwitchDocument(lastActiveId);
       } else {
         try {
-          const latestDocResponse = await fetch(`${API_URL}/document/latest`, { cache: 'no-store' });
+          // Menambahkan header ke fetch
+          const latestDocResponse = await fetch(`${API_URL}/document/latest`, { 
+            cache: 'no-store',
+            headers: ngrokSkipHeader
+          });
           const latestDocData = await latestDocResponse.json();
           if (latestDocResponse.ok && latestDocData.id) {
             await handleSwitchDocument(latestDocData.id);
