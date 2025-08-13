@@ -22,22 +22,23 @@ export default function HomePage() {
   const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Menggunakan environment variable, ini sudah benar.
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
 
   const fetchDocuments = async () => {
     try {
-      // --- PERBAIKAN DI SINI: Tambahkan { cache: 'no-store' } ---
+      // --- PERBAIKAN DI SINI: Memaksa request baru & tidak menggunakan cache ---
       const response = await fetch(`${API_URL}/documents`, { cache: 'no-store' });
       const data = await response.json();
       if (response.ok) {
         setDocuments(data);
       } else {
         console.error("Gagal mengambil riwayat:", data.error);
-        setDocuments([]); // Set ke array kosong jika gagal
+        setDocuments([]); // Pastikan daftar kosong jika ada error
       }
     } catch (err) { 
-      console.error("Error saat fetch riwayat:", err);
-      setDocuments([]); // Set ke array kosong jika ada error koneksi
+      console.error("Error koneksi saat fetch riwayat:", err);
+      setDocuments([]); // Pastikan daftar kosong jika koneksi gagal
     }
   };
 
@@ -70,7 +71,8 @@ export default function HomePage() {
         await handleSwitchDocument(lastActiveId);
       } else {
         try {
-          const latestDocResponse = await fetch(`${API_URL}/document/latest`);
+          // --- PERBAIKAN DI SINI: Memaksa request baru & tidak menggunakan cache ---
+          const latestDocResponse = await fetch(`${API_URL}/document/latest`, { cache: 'no-store' });
           const latestDocData = await latestDocResponse.json();
           if (latestDocResponse.ok && latestDocData.id) {
             await handleSwitchDocument(latestDocData.id);
