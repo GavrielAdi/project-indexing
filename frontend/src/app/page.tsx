@@ -6,6 +6,7 @@ import Sidebar from '../components/Sidebar';
 import SearchPage from '../components/SearchPage';
 import UploadPage from '../components/UploadPage';
 import SettingsPage from '../components/SettingsPage';
+import { FiMenu } from 'react-icons/fi'; // Impor ikon untuk menu
 
 export interface Document {
   id: string;
@@ -22,16 +23,17 @@ export default function HomePage() {
   const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // --- STATE BARU UNTUK SIDEBAR MOBILE ---
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
 
-  // --- OPSI HEADER BARU UNTUK NGROK ---
   const ngrokSkipHeader = {
     'ngrok-skip-browser-warning': 'true',
   };
 
   const fetchDocuments = async () => {
     try {
-      // Menambahkan header ke fetch
       const response = await fetch(`${API_URL}/documents`, { 
         cache: 'no-store',
         headers: ngrokSkipHeader 
@@ -62,7 +64,6 @@ export default function HomePage() {
     if (!docId) return;
     setIsLoading(true);
     try {
-      // Menambahkan header ke fetch
       const response = await fetch(`${API_URL}/switch_document/${docId}`, { 
         method: 'POST',
         headers: ngrokSkipHeader
@@ -91,7 +92,6 @@ export default function HomePage() {
         await handleSwitchDocument(lastActiveId);
       } else {
         try {
-          // Menambahkan header ke fetch
           const latestDocResponse = await fetch(`${API_URL}/document/latest`, { 
             cache: 'no-store',
             headers: ngrokSkipHeader
@@ -130,32 +130,68 @@ export default function HomePage() {
 
   return (
     <div className="dark">
-      <div className="flex min-h-screen bg-gray-900 text-white">
-        <Sidebar activePage={activePage} setActivePage={setActivePage} />
-        <main className="flex-1 p-8 overflow-y-auto">
-          {activePage === 'pencarian' && (
-            <SearchPage
-              indexedFile={indexedFile}
-              isLoading={isLoading}
-              setIsLoading={setIsLoading}
-              documents={documents}
-              activeDocumentId={activeDocumentId}
-              onSwitchDocument={handleSwitchDocument}
-            />
-          )}
-          {activePage === 'upload' && (
-            <UploadPage
-              onUploadSuccess={handleUploadSuccess}
-              onSwitchDocument={handleSwitchDocument}
-              isLoading={isLoading}
-              indexedFile={indexedFile}
-              resetActiveFile={resetActiveFile}
-              documents={documents}
-              fetchDocuments={fetchDocuments}
-            />
-          )}
-          {activePage === 'pengaturan' && <SettingsPage />}
-        </main>
+      <div className="flex h-screen bg-gray-900 text-white">
+        {/* Sidebar untuk Desktop (md:flex) */}
+        <div className="hidden md:flex flex-shrink-0">
+          <Sidebar activePage={activePage} setActivePage={setActivePage} />
+        </div>
+
+        {/* Sidebar untuk Mobile (Overlay) */}
+        {isSidebarOpen && (
+          <div className="md:hidden fixed inset-0 z-50 bg-gray-900 bg-opacity-70" onClick={() => setIsSidebarOpen(false)}>
+            <div className="fixed inset-y-0 left-0 w-64 bg-gray-800 shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <Sidebar 
+                activePage={activePage} 
+                setActivePage={(page) => {
+                  setActivePage(page);
+                  setIsSidebarOpen(false); // Otomatis tutup sidebar setelah item diklik
+                }}
+                onClose={() => setIsSidebarOpen(false)}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 flex flex-col w-full min-w-0">
+          {/* Header untuk Mobile (md:hidden) */}
+          <header className="sticky top-0 z-40 flex items-center justify-between bg-gray-900/80 backdrop-blur-sm p-4 border-b border-gray-700 md:hidden">
+            <div className="flex items-center gap-4">
+              <button 
+                className="p-1 text-gray-300 hover:text-white"
+                onClick={() => setIsSidebarOpen(true)}
+              >
+                <FiMenu size={24} />
+              </button>
+              <h1 className="text-xl font-bold text-white">DocuSearch</h1>
+            </div>
+          </header>
+
+          {/* Konten Utama dibuat scrollable */}
+          <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+            {activePage === 'pencarian' && (
+              <SearchPage
+                indexedFile={indexedFile}
+                isLoading={isLoading}
+                setIsLoading={setIsLoading}
+                documents={documents}
+                activeDocumentId={activeDocumentId}
+                onSwitchDocument={handleSwitchDocument}
+              />
+            )}
+            {activePage === 'upload' && (
+              <UploadPage
+                onUploadSuccess={handleUploadSuccess}
+                onSwitchDocument={handleSwitchDocument}
+                isLoading={isLoading}
+                indexedFile={indexedFile}
+                resetActiveFile={resetActiveFile}
+                documents={documents}
+                fetchDocuments={fetchDocuments}
+              />
+            )}
+            {activePage === 'pengaturan' && <SettingsPage />}
+          </main>
+        </div>
       </div>
     </div>
   );

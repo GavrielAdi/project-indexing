@@ -30,7 +30,6 @@ export default function SearchPage({ indexedFile, isLoading, setIsLoading, docum
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
 
-  // Handler pencarian tidak berubah
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     let searchQuery = query;
@@ -51,7 +50,6 @@ export default function SearchPage({ indexedFile, isLoading, setIsLoading, docum
     finally { setIsLoading(false); }
   };
 
-  // Handler lain juga tidak berubah
   const handleQueryChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const newQuery = e.target.value;
     setQuery(newQuery);
@@ -85,19 +83,19 @@ export default function SearchPage({ indexedFile, isLoading, setIsLoading, docum
   };
 
   return (
-    <div className="space-y-8">
-      {/* --- BAGIAN INI BERUBAH MENJADI DROPDOWN --- */}
+    <div className="space-y-6 md:space-y-8">
+      {/* Dropdown File Aktif */}
       <div className="bg-gray-800 p-4 rounded-lg shadow-md flex items-center gap-4">
-        <FiFileText className="text-2xl text-blue-400 flex-shrink-0" />
-        <div className="flex-grow">
-          <label htmlFor="doc-select" className="text-sm text-gray-400">File Aktif Untuk Pencarian</label>
+        <FiFileText className="text-xl md:text-2xl text-blue-400 flex-shrink-0" />
+        <div className="flex-grow min-w-0">
+          <label htmlFor="doc-select" className="text-xs md:text-sm text-gray-400">File Aktif Untuk Pencarian</label>
           <div className="relative">
             <select
               id="doc-select"
               value={activeDocumentId || ''}
               onChange={(e) => onSwitchDocument(e.target.value)}
               disabled={isLoading || documents.length === 0}
-              className="w-full bg-transparent font-semibold text-white appearance-none focus:outline-none pr-8"
+              className="w-full bg-transparent font-semibold text-white appearance-none focus:outline-none pr-8 truncate"
             >
               {documents.length > 0 ? (
                 documents.map(doc => (
@@ -106,7 +104,9 @@ export default function SearchPage({ indexedFile, isLoading, setIsLoading, docum
                   </option>
                 ))
               ) : (
-                <option value="" disabled>Tidak ada dokumen tersedia</option>
+                <option value="" disabled>
+                  {isLoading ? 'Memuat...' : 'Tidak ada dokumen tersedia'}
+                </option>
               )}
             </select>
             <FiChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -114,11 +114,12 @@ export default function SearchPage({ indexedFile, isLoading, setIsLoading, docum
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-5 gap-8">
-        {/* Kolom Kiri: Input Pencarian */}
+      {/* Layout grid responsif */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 md:gap-8">
+        {/* Kolom Kiri (Input Pencarian) */}
         <div className="lg:col-span-2">
-          <div className="bg-gray-800 p-6 rounded-lg shadow-md">
-            <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2 text-white"><FiSearch /> Cari Frasa</h2>
+          <div className="bg-gray-800 p-4 md:p-6 rounded-lg shadow-md">
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-white"><FiSearch /> Cari Frasa</h2>
             <div className="relative">
               <form onSubmit={handleSearch} className="flex gap-2">
                 <input type="text" value={query} onChange={handleQueryChange} onKeyDown={handleKeyDown} placeholder="Masukkan frasa..." disabled={isLoading || !activeDocumentId} className="flex-grow bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-600" />
@@ -135,10 +136,10 @@ export default function SearchPage({ indexedFile, isLoading, setIsLoading, docum
           </div>
         </div>
 
-        {/* Kolom Kanan: Hasil Pencarian */}
+        {/* Kolom Kanan (Hasil Pencarian) */}
         <div className="lg:col-span-3">
-          <div className="bg-gray-800 p-6 rounded-lg shadow-md h-full">
-            <h3 className="text-2xl font-semibold mb-4 text-white">Hasil Pencarian</h3>
+          <div className="bg-gray-800 p-4 md:p-6 rounded-lg shadow-md h-full">
+            <h3 className="text-xl font-semibold mb-4 text-white">Hasil Pencarian</h3>
             <p className="text-sm text-gray-400 mb-4">{results.count} hasil ditemukan</p>
             <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
               {results.snippets.map((snippet, index) => (<div key={index} dangerouslySetInnerHTML={{ __html: snippet.replace(/<strong>/g, '<strong class="bg-yellow-400 text-gray-900 font-bold px-1 rounded">') }} className="text-gray-300 border-l-4 border-blue-500 pl-4 py-2 text-justify" />))}
