@@ -21,6 +21,8 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
   const [isUploading, setIsUploading] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
+  // --- PERBAIKAN DI SINI: Definisikan header di satu tempat ---
+  const apiHeaders = { 'ngrok-skip-browser-warning': 'true' };
 
   const handleFileUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +35,12 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
     setIsUploading(true);
     setUploadMessage('Mengunggah dan mengindeks...');
     try {
-      const response = await fetch(`${API_URL}/upload`, { method: 'POST', body: formData });
+      // Menambahkan header ke fetch (catatan: untuk FormData, jangan set Content-Type)
+      const response = await fetch(`${API_URL}/upload`, { 
+        method: 'POST', 
+        body: formData,
+        headers: { 'ngrok-skip-browser-warning': 'true' }
+      });
       const data = await response.json();
       setUploadMessage(data.message || data.error);
       if (response.ok) {
@@ -59,7 +66,11 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
       return;
     }
     try {
-      const response = await fetch(`${API_URL}/document/${doc.id}`, { method: 'DELETE' });
+      // Menambahkan header ke fetch
+      const response = await fetch(`${API_URL}/document/${doc.id}`, { 
+        method: 'DELETE',
+        headers: apiHeaders
+      });
       const data = await response.json();
       alert(data.message || data.error);
       if (response.ok) {
