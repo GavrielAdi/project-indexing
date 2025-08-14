@@ -3,32 +3,32 @@
 
 import { useState } from 'react';
 import { FiSearch, FiFileText, FiLoader, FiChevronDown } from 'react-icons/fi';
-import { Document } from '../app/page'; // Impor tipe Document
+import { Document } from '../app/page';
 
-// Definisikan tipe untuk props yang diterima dari parent
 interface SearchPageProps {
   indexedFile: string;
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
-  documents: Document[]; // Terima daftar dokumen
-  activeDocumentId: string | null; // Terima ID yang aktif
-  onSwitchDocument: (docId: string) => void; // Terima fungsi switch
+  documents: Document[];
+  activeDocumentId: string | null;
+  onSwitchDocument: (docId: string) => void;
 }
 
-// Definisikan tipe untuk hasil pencarian
 interface SearchResults {
   count: number;
   snippets: string[];
 }
 
 export default function SearchPage({ indexedFile, isLoading, setIsLoading, documents, activeDocumentId, onSwitchDocument }: SearchPageProps) {
-  // State khusus untuk halaman pencarian
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResults>({ count: 0, snippets: [] });
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
+  
+  // --- PERBAIKAN DI SINI: Definisikan header di satu tempat ---
+  const apiHeaders = { 'ngrok-skip-browser-warning': 'true' };
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +43,8 @@ export default function SearchPage({ indexedFile, isLoading, setIsLoading, docum
     setActiveIndex(-1);
     setResults({ count: 0, snippets: [] });
     try {
-      const response = await fetch(`${API_URL}/search?query=${encodeURIComponent(searchQuery)}`);
+      // Menambahkan header ke fetch
+      const response = await fetch(`${API_URL}/search?query=${encodeURIComponent(searchQuery)}`, { headers: apiHeaders });
       const data = await response.json();
       setResults(data);
     } catch (err) { console.error("Gagal melakukan pencarian:", err); }
@@ -56,7 +57,8 @@ export default function SearchPage({ indexedFile, isLoading, setIsLoading, docum
     setActiveIndex(-1);
     if (newQuery.length > 1) {
       try {
-        const response = await fetch(`${API_URL}/autocomplete?prefix=${newQuery}`);
+        // Menambahkan header ke fetch
+        const response = await fetch(`${API_URL}/autocomplete?prefix=${newQuery}`, { headers: apiHeaders });
         if (!response.ok) throw new Error("Network response was not ok");
         const data = await response.json();
         setSuggestions(data);
@@ -116,7 +118,6 @@ export default function SearchPage({ indexedFile, isLoading, setIsLoading, docum
 
       {/* Layout grid responsif */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 md:gap-8">
-        {/* Kolom Kiri (Input Pencarian) */}
         <div className="lg:col-span-2">
           <div className="bg-gray-800 p-4 md:p-6 rounded-lg shadow-md">
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-white"><FiSearch /> Cari Frasa</h2>
@@ -135,8 +136,6 @@ export default function SearchPage({ indexedFile, isLoading, setIsLoading, docum
             </div>
           </div>
         </div>
-
-        {/* Kolom Kanan (Hasil Pencarian) */}
         <div className="lg:col-span-3">
           <div className="bg-gray-800 p-4 md:p-6 rounded-lg shadow-md h-full">
             <h3 className="text-xl font-semibold mb-4 text-white">Hasil Pencarian</h3>
