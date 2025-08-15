@@ -178,6 +178,11 @@ def upload_file_to_db():
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
     file = request.files['file']
+    
+    # --- PERUBAHAN DI SINI: Ambil data tambahan dari form ---
+    uploaded_by = request.form.get('uploaded_by', 'Anonim')
+    tags_string = request.form.get('tags', '')
+    
     if file.filename == '' or not allowed_file(file.filename):
         return jsonify({'error': 'File tidak dipilih atau tipe tidak diizinkan'}), 400
 
@@ -210,11 +215,17 @@ def upload_file_to_db():
     
     index_data_dict = pos_index_obj.to_dict()
     
+    # --- PERUBAHAN DI SINI: Proses tag ---
+    # Ubah string "tag1, tag2" menjadi list ["tag1", "tag2"]
+    tags_list = [tag.strip() for tag in tags_string.split(',') if tag.strip()]
+
     file_metadata_collection.insert_one({
         'gridfs_id': gridfs_id,
         'filename': filename,
         'upload_date': datetime.now(),
-        'index_data': index_data_dict
+        'index_data': index_data_dict,
+        'uploaded_by': uploaded_by, # Simpan nama pengunggah
+        'tags': tags_list          # Simpan daftar tag
     })
     
     return jsonify({'message': f'File {filename} berhasil disimpan ke database dan di-indeks.'}), 201
@@ -222,9 +233,17 @@ def upload_file_to_db():
 @app.route('/documents', methods=['GET'])
 def get_documents_from_db():
     try:
-        documents = list(file_metadata_collection.find({}, {"filename": 1, "upload_date": 1}).sort("upload_date", -1))
-        print(f"DEBUG: Ditemukan {len(documents)} dokumen di database.")
-        doc_list = [{'id': str(doc['_id']), 'filename': doc['filename'], 'upload_date': doc['upload_date'].strftime("%Y-%m-%d %H:%M:%S")} for doc in documents]
+        # --- PERUBAHAN DI SINI: Ambil juga field baru ---
+        documents = file_metadata_collection.find({}, {"filename": 1, "upload_date": 1, "uploaded_by": 1, "tags": 1}).sort("upload_date", -1)
+        doc_list = []
+        for doc in documents:
+            doc_list.append({
+                'id': str(doc['_id']), 
+                'filename': doc['filename'],
+                'upload_date': doc['upload_date'].strftime("%Y-%m-%d %H:%M:%S"),
+                'uploaded_by': doc.get('uploaded_by', 'N/A'), # Beri nilai default jika field belum ada
+                'tags': doc.get('tags', []) # Beri nilai default jika field belum ada
+            })
         return jsonify(doc_list)
     except Exception as e:
         app.logger.error(f"Get documents error: {e}")
@@ -320,5 +339,4 @@ def internal_server_error(e):
 # ======================================================================
 if __name__ == '__main__':
     print("--- Server dimulai, siap menerima koneksi ---")
-    # Gunakan host='0.0.0.0' agar bisa diakses via Ngrok
     app.run(host='0.0.0.0', port=5000)

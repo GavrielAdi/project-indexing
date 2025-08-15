@@ -6,75 +6,49 @@ import Sidebar from '../components/Sidebar';
 import SearchPage from '../components/SearchPage';
 import UploadPage from '../components/UploadPage';
 import SettingsPage from '../components/SettingsPage';
-import { FiMenu } from 'react-icons/fi'; // Impor ikon untuk menu
+import { FiMenu } from 'react-icons/fi';
 
+// --- PERUBAHAN DI SINI: Tambahkan uploaded_by dan tags ---
 export interface Document {
   id: string;
   filename: string;
   upload_date: string;
+  uploaded_by: string;
+  tags: string[];
 }
 
 const LOCAL_STORAGE_KEY = 'lastActiveDocumentId';
 
 export default function HomePage() {
-  const [activePage, setActivePage] = useState('pencarian');
+  const [activePage, setActivePage] = useState('upload'); // Arahkan ke upload untuk melihat perubahan
   const [documents, setDocuments] = useState<Document[]>([]);
   const [indexedFile, setIndexedFile] = useState('Memuat...');
   const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  // --- STATE BARU UNTUK SIDEBAR MOBILE ---
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
-
-  const ngrokSkipHeader = {
-    'ngrok-skip-browser-warning': 'true',
-  };
+  const apiHeaders = { 'ngrok-skip-browser-warning': 'true' };
 
   const fetchDocuments = async () => {
     try {
-      const response = await fetch(`${API_URL}/documents`, { 
-        cache: 'no-store',
-        headers: ngrokSkipHeader 
-      });
-
-      const contentType = response.headers.get("content-type");
-      if (contentType && contentType.indexOf("application/json") !== -1) {
-        const data = await response.json();
-        if (response.ok) {
-          setDocuments(data);
-        } else {
-          console.error("Gagal mengambil riwayat (respons JSON error):", data.error);
-          setDocuments([]);
-        }
-      } else {
-        const textResponse = await response.text();
-        console.error("--- KESALAHAN KRITIS: Backend tidak mengirim JSON! (Kemungkinan dari Ngrok) ---");
-        console.error("Ini adalah respons HTML yang diterima:", textResponse);
-        throw new Error("Backend response was not JSON.");
-      }
-    } catch (err) { 
-      console.error("Error koneksi atau parsing saat fetch riwayat:", err);
-      setDocuments([]);
-    }
+      const response = await fetch(`${API_URL}/documents`, { cache: 'no-store', headers: apiHeaders });
+      const data = await response.json();
+      if (response.ok) setDocuments(data);
+    } catch (err) { console.error("Error saat fetch riwayat:", err); }
   };
 
   const handleSwitchDocument = async (docId: string) => {
     if (!docId) return;
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/switch_document/${docId}`, { 
-        method: 'POST',
-        headers: ngrokSkipHeader
-      });
+      const response = await fetch(`${API_URL}/switch_document/${docId}`, { method: 'POST', headers: apiHeaders });
       const data = await response.json();
       if (response.ok) {
         setIndexedFile(data.filename);
         setActiveDocumentId(docId);
         localStorage.setItem(LOCAL_STORAGE_KEY, docId);
       } else {
-        console.error("Gagal switch dokumen:", data.error);
         localStorage.removeItem(LOCAL_STORAGE_KEY);
       }
     } catch (err) { console.error("Error saat switch dokumen:", err); }
@@ -85,27 +59,19 @@ export default function HomePage() {
     const fetchInitialData = async () => {
       setIsLoading(true);
       await fetchDocuments();
-      
       const lastActiveId = localStorage.getItem(LOCAL_STORAGE_KEY);
-
       if (lastActiveId) {
         await handleSwitchDocument(lastActiveId);
       } else {
         try {
-          const latestDocResponse = await fetch(`${API_URL}/document/latest`, { 
-            cache: 'no-store',
-            headers: ngrokSkipHeader
-          });
+          const latestDocResponse = await fetch(`${API_URL}/document/latest`, { cache: 'no-store', headers: apiHeaders });
           const latestDocData = await latestDocResponse.json();
           if (latestDocResponse.ok && latestDocData.id) {
             await handleSwitchDocument(latestDocData.id);
           } else {
             setIndexedFile("Tidak ada dokumen di database.");
           }
-        } catch (err) {
-          console.error("Gagal memuat data awal:", err);
-          setIndexedFile("Gagal terhubung ke backend.");
-        }
+        } catch (err) { setIndexedFile("Gagal terhubung ke backend."); }
       }
       setIsLoading(false);
     };
@@ -131,12 +97,9 @@ export default function HomePage() {
   return (
     <div className="dark">
       <div className="flex h-screen bg-gray-900 text-white">
-        {/* Sidebar untuk Desktop (md:flex) */}
         <div className="hidden md:flex flex-shrink-0">
           <Sidebar activePage={activePage} setActivePage={setActivePage} />
         </div>
-
-        {/* Sidebar untuk Mobile (Overlay) */}
         {isSidebarOpen && (
           <div className="md:hidden fixed inset-0 z-50 bg-gray-900 bg-opacity-70" onClick={() => setIsSidebarOpen(false)}>
             <div className="fixed inset-y-0 left-0 w-64 bg-gray-800 shadow-xl" onClick={(e) => e.stopPropagation()}>
@@ -144,29 +107,22 @@ export default function HomePage() {
                 activePage={activePage} 
                 setActivePage={(page) => {
                   setActivePage(page);
-                  setIsSidebarOpen(false); // Otomatis tutup sidebar setelah item diklik
+                  setIsSidebarOpen(false);
                 }}
                 onClose={() => setIsSidebarOpen(false)}
               />
             </div>
           </div>
         )}
-
         <div className="flex-1 flex flex-col w-full min-w-0">
-          {/* Header untuk Mobile (md:hidden) */}
           <header className="sticky top-0 z-40 flex items-center justify-between bg-gray-900/80 backdrop-blur-sm p-4 border-b border-gray-700 md:hidden">
             <div className="flex items-center gap-4">
-              <button 
-                className="p-1 text-gray-300 hover:text-white"
-                onClick={() => setIsSidebarOpen(true)}
-              >
+              <button className="p-1 text-gray-300 hover:text-white" onClick={() => setIsSidebarOpen(true)}>
                 <FiMenu size={24} />
               </button>
               <h1 className="text-xl font-bold text-white">DocuSearch</h1>
             </div>
           </header>
-
-          {/* Konten Utama dibuat scrollable */}
           <main className="flex-1 p-4 md:p-8 overflow-y-auto">
             {activePage === 'pencarian' && (
               <SearchPage
