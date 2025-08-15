@@ -178,8 +178,6 @@ def upload_file_to_db():
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
     file = request.files['file']
-    
-    # --- PERUBAHAN DI SINI: Ambil data tambahan dari form ---
     uploaded_by = request.form.get('uploaded_by', 'Anonim')
     tags_string = request.form.get('tags', '')
     
@@ -215,17 +213,17 @@ def upload_file_to_db():
     
     index_data_dict = pos_index_obj.to_dict()
     
-    # --- PERUBAHAN DI SINI: Proses tag ---
-    # Ubah string "tag1, tag2" menjadi list ["tag1", "tag2"]
     tags_list = [tag.strip() for tag in tags_string.split(',') if tag.strip()]
-
+    
+    now = datetime.now()
     file_metadata_collection.insert_one({
         'gridfs_id': gridfs_id,
         'filename': filename,
-        'upload_date': datetime.now(),
+        'upload_date': now,
+        'last_modified_date': now, # Tambahkan field baru
         'index_data': index_data_dict,
-        'uploaded_by': uploaded_by, # Simpan nama pengunggah
-        'tags': tags_list          # Simpan daftar tag
+        'uploaded_by': uploaded_by,
+        'tags': tags_list
     })
     
     return jsonify({'message': f'File {filename} berhasil disimpan ke database dan di-indeks.'}), 201
@@ -233,16 +231,18 @@ def upload_file_to_db():
 @app.route('/documents', methods=['GET'])
 def get_documents_from_db():
     try:
-        # --- PERUBAHAN DI SINI: Ambil juga field baru ---
-        documents = file_metadata_collection.find({}, {"filename": 1, "upload_date": 1, "uploaded_by": 1, "tags": 1}).sort("upload_date", -1)
+        # Ambil juga field last_modified_date
+        documents = file_metadata_collection.find({}, {"filename": 1, "upload_date": 1, "uploaded_by": 1, "tags": 1, "last_modified_date": 1}).sort("upload_date", -1)
         doc_list = []
         for doc in documents:
             doc_list.append({
                 'id': str(doc['_id']), 
                 'filename': doc['filename'],
                 'upload_date': doc['upload_date'].strftime("%Y-%m-%d %H:%M:%S"),
-                'uploaded_by': doc.get('uploaded_by', 'N/A'), # Beri nilai default jika field belum ada
-                'tags': doc.get('tags', []) # Beri nilai default jika field belum ada
+                # Tambahkan field baru, beri fallback ke upload_date untuk data lama
+                'last_modified_date': doc.get('last_modified_date', doc['upload_date']).strftime("%Y-%m-%d %H:%M:%S"),
+                'uploaded_by': doc.get('uploaded_by', 'N/A'),
+                'tags': doc.get('tags', [])
             })
         return jsonify(doc_list)
     except Exception as e:
@@ -328,6 +328,44 @@ def delete_document(doc_id):
     except Exception as e:
         app.logger.error(f"Delete document error: {e}")
         return jsonify({'error': 'Gagal menghapus dokumen.'}), 500
+
+@app.route('/document/<doc_id>', methods=['PUT'])
+def update_document(doc_id):
+    try:
+        obj_id = ObjectId(doc_id)
+    except (InvalidId, TypeError):
+        return jsonify({'error': 'Format ID dokumen tidak valid.'}), 400
+
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Request body tidak boleh kosong.'}), 400
+
+        updated_by = data.get('uploaded_by')
+        tags_string = data.get('tags', '')
+
+        if not updated_by or not updated_by.strip():
+            return jsonify({'error': 'Nama pengunggah tidak boleh kosong.'}), 400
+
+        tags_list = [tag.strip() for tag in tags_string.split(',') if tag.strip()]
+
+        update_result = file_metadata_collection.update_one(
+            {'_id': obj_id},
+            {'$set': {
+                'uploaded_by': updated_by.strip(),
+                'tags': tags_list,
+                'last_modified_date': datetime.now() # Update timestamp saat diedit
+            }}
+        )
+
+        if update_result.matched_count == 0:
+            return jsonify({'error': 'Dokumen tidak ditemukan.'}), 404
+
+        return jsonify({'message': 'Dokumen berhasil diperbarui.'}), 200
+
+    except Exception as e:
+        app.logger.error(f"Update document error: {e}")
+        return jsonify({'error': 'Gagal memperbarui dokumen.'}), 500
 
 @app.errorhandler(500)
 def internal_server_error(e):

@@ -15,6 +15,7 @@ export interface Document {
   upload_date: string;
   uploaded_by: string;
   tags: string[];
+  last_modified_date: string; 
 }
 
 const LOCAL_STORAGE_KEY = 'lastActiveDocumentId';
