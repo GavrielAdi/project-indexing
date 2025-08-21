@@ -28,7 +28,7 @@ import gridfs
 
 # --- KONFIGURASI APLIKASI ---
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 load_dotenv()
 
 ALLOWED_EXTENSIONS = {'docx', 'pdf', 'xlsx', 'txt'}
@@ -91,6 +91,9 @@ class PositionalIndex:
         instance.dokumen = data.get('dokumen', [])
         return instance
 
+class TrieNode:
+    def __init__(self): self.children, self.is_end_of_word = {}, False
+
 class Trie:
     def __init__(self): self.root = TrieNode()
     def insert(self, word):
@@ -113,8 +116,6 @@ class Trie:
             if char not in node.children: return []
             node = node.children[char]
         return self._dfs(node, prefix)
-class TrieNode:
-    def __init__(self): self.children, self.is_end_of_word = {}, False
 
 
 # ======================================================================
@@ -180,66 +181,52 @@ def upload_file_to_db():
     file = request.files['file']
     uploaded_by = request.form.get('uploaded_by', 'Anonim')
     tags_string = request.form.get('tags', '')
-    
     if file.filename == '' or not allowed_file(file.filename):
         return jsonify({'error': 'File tidak dipilih atau tipe tidak diizinkan'}), 400
-
     filename = secure_filename(file.filename)
     if file_metadata_collection.find_one({'filename': filename}):
         return jsonify({'error': f'File dengan nama {filename} sudah ada di database.'}), 409
-
     file_content = file.read()
-    
     detected_mime_type = magic.from_buffer(file_content, mime=True)
     file_ext = filename.rsplit('.', 1)[1].lower()
     expected_mime_type = ALLOWED_MIME_TYPES.get(file_ext)
-    
     if detected_mime_type != expected_mime_type:
         return jsonify({'error': f'Konten file tidak cocok dengan ekstensi .{file_ext}. Terdeteksi: {detected_mime_type}'}), 400
-
     try:
         gridfs_id = fs.put(file_content, filename=filename)
     except Exception as e:
         app.logger.error(f"GridFS put error: {e}")
         return jsonify({'error': 'Gagal menyimpan file ke database.'}), 500
-
     tokens = process_file_from_bytes(file_content, filename)
     if not tokens:
         fs.delete(gridfs_id)
         return jsonify({'error': 'Gagal memproses teks dari file'}), 500
-
     pos_index_obj = PositionalIndex()
     pos_index_obj.build(tokens)
-    
     index_data_dict = pos_index_obj.to_dict()
-    
     tags_list = [tag.strip() for tag in tags_string.split(',') if tag.strip()]
-    
     now = datetime.now()
     file_metadata_collection.insert_one({
         'gridfs_id': gridfs_id,
         'filename': filename,
         'upload_date': now,
-        'last_modified_date': now, # Tambahkan field baru
+        'last_modified_date': now,
         'index_data': index_data_dict,
         'uploaded_by': uploaded_by,
         'tags': tags_list
     })
-    
     return jsonify({'message': f'File {filename} berhasil disimpan ke database dan di-indeks.'}), 201
 
 @app.route('/documents', methods=['GET'])
 def get_documents_from_db():
     try:
-        # Ambil juga field last_modified_date
-        documents = file_metadata_collection.find({}, {"filename": 1, "upload_date": 1, "uploaded_by": 1, "tags": 1, "last_modified_date": 1}).sort("upload_date", -1)
+        documents = file_metadata_collection.find({}, {"filename": 1, "upload_date": 1, "uploaded_by": 1, "tags": 1, "last_modified_date": 1}).sort("last_modified_date", -1)
         doc_list = []
         for doc in documents:
             doc_list.append({
                 'id': str(doc['_id']), 
                 'filename': doc['filename'],
                 'upload_date': doc['upload_date'].strftime("%Y-%m-%d %H:%M:%S"),
-                # Tambahkan field baru, beri fallback ke upload_date untuk data lama
                 'last_modified_date': doc.get('last_modified_date', doc['upload_date']).strftime("%Y-%m-%d %H:%M:%S"),
                 'uploaded_by': doc.get('uploaded_by', 'N/A'),
                 'tags': doc.get('tags', [])
@@ -248,6 +235,16 @@ def get_documents_from_db():
     except Exception as e:
         app.logger.error(f"Get documents error: {e}")
         return jsonify({'error': 'Gagal mengambil daftar dokumen.'}), 500
+
+@app.route('/tags', methods=['GET'])
+def get_all_tags():
+    try:
+        all_tags = file_metadata_collection.distinct('tags')
+        all_tags.sort()
+        return jsonify(all_tags)
+    except Exception as e:
+        app.logger.error(f"Get tags error: {e}")
+        return jsonify({'error': 'Gagal mengambil daftar tag.'}), 500
 
 @app.route('/switch_document/<doc_id>', methods=['POST'])
 def switch_document(doc_id):
@@ -354,7 +351,7 @@ def update_document(doc_id):
             {'$set': {
                 'uploaded_by': updated_by.strip(),
                 'tags': tags_list,
-                'last_modified_date': datetime.now() # Update timestamp saat diedit
+                'last_modified_date': datetime.now()
             }}
         )
 
@@ -367,14 +364,39 @@ def update_document(doc_id):
         app.logger.error(f"Update document error: {e}")
         return jsonify({'error': 'Gagal memperbarui dokumen.'}), 500
 
+@app.route('/stats', methods=['GET'])
+def get_stats():
+    try:
+        total_documents = file_metadata_collection.count_documents({})
+        total_tags = len(file_metadata_collection.distinct('tags'))
+        
+        latest_doc = file_metadata_collection.find_one(
+            {}, 
+            sort=[("upload_date", -1)]
+        )
+        
+        latest_upload = {
+            'filename': latest_doc['filename'],
+            'upload_date': latest_doc['upload_date'].strftime("%Y-%m-%d %H:%M:%S")
+        } if latest_doc else None
+
+        return jsonify({
+            'total_documents': total_documents,
+            'total_tags': total_tags,
+            'latest_upload': latest_upload
+        })
+    except Exception as e:
+        app.logger.error(f"Get stats error: {e}")
+        return jsonify({'error': 'Gagal mengambil statistik.'}), 500
+
 @app.errorhandler(500)
 def internal_server_error(e):
     app.logger.error(f"Internal Server Error: {e}", exc_info=True)
     return jsonify(error="Terjadi kesalahan internal pada server. Silakan cek log."), 500
 
 # ======================================================================
-# BAGIAN 5: MENJALANKAN APLIKASI
+# BAGIAN 4: MENJALANKAN APLIKASI
 # ======================================================================
 if __name__ == '__main__':
     print("--- Server dimulai, siap menerima koneksi ---")
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)

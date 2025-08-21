@@ -1,7 +1,7 @@
 // file: frontend/src/components/UploadPage.tsx
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { FiUpload, FiLoader, FiFileText, FiRefreshCw, FiCheckCircle, FiTrash2, FiActivity, FiEdit2, FiUser, FiTag, FiSearch } from 'react-icons/fi';
 import { Document } from '../app/page';
 import EditModal from './EditModal';
@@ -28,13 +28,35 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [documentToEdit, setDocumentToEdit] = useState<Document | null>(null);
 
-  // --- State untuk filter dan sortir ---
+  // --- State baru untuk filter dan sortir ---
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchField, setSearchField] = useState('all'); // Opsi: all, filename, uploaded_by, tags
-  const [sortBy, setSortBy] = useState('newest'); // Opsi: newest, oldest, az, za
+  const [searchField, setSearchField] = useState('all');
+  const [sortBy, setSortBy] = useState('newest');
+  const [allTags, setAllTags] = useState<string[]>([]); // State baru untuk daftar semua tag
+  const [selectedTag, setSelectedTag] = useState(''); // State baru untuk tag yang dipilih
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
   const apiHeaders = { 'ngrok-skip-browser-warning': 'true' };
+
+  // --- Fungsi baru untuk mengambil semua tag unik ---
+  const fetchAllTags = async () => {
+    try {
+        const response = await fetch(`${API_URL}/tags`, { headers: apiHeaders });
+        const data = await response.json();
+        if (response.ok) {
+            setAllTags(data);
+        } else {
+            console.error("Gagal mengambil daftar tag:", data.error);
+        }
+    } catch (err) {
+        console.error("Error saat fetch tags:", err);
+    }
+  };
+
+  // Ambil daftar tag saat komponen pertama kali dimuat
+  useEffect(() => {
+    fetchAllTags();
+  }, [documents]); // Jalankan juga setiap kali daftar dokumen berubah
 
   const handleOpenEditModal = (doc: Document) => {
     setDocumentToEdit(doc);
@@ -45,8 +67,14 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
   const filteredAndSortedDocuments = useMemo(() => {
     let filtered = documents;
 
+    // 1. Filter berdasarkan tag yang dipilih
+    if (selectedTag) {
+        filtered = filtered.filter(doc => doc.tags.includes(selectedTag));
+    }
+
+    // 2. Filter berdasarkan kata kunci pencarian
     if (searchTerm) {
-        filtered = documents.filter(doc => {
+        filtered = filtered.filter(doc => {
             const term = searchTerm.toLowerCase();
             switch (searchField) {
                 case 'filename':
@@ -64,6 +92,7 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
         });
     }
 
+    // 3. Lakukan penyortiran
     switch (sortBy) {
         case 'oldest':
             return [...filtered].sort((a, b) => new Date(a.upload_date).getTime() - new Date(b.upload_date).getTime());
@@ -73,10 +102,9 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
             return [...filtered].sort((a, b) => b.filename.localeCompare(a.filename));
         case 'newest':
         default:
-            // Menggunakan last_modified_date untuk sortir terbaru
             return [...filtered].sort((a, b) => new Date(b.last_modified_date).getTime() - new Date(a.last_modified_date).getTime());
     }
-  }, [documents, searchTerm, sortBy, searchField]);
+  }, [documents, searchTerm, sortBy, searchField, selectedTag]);
 
 
   const handleFileUpload = async (e: React.FormEvent) => {
@@ -184,8 +212,9 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
             </button>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 mb-4">
-            <div className="relative flex-grow">
+          {/* --- PANEL FILTER DAN SORTIR BARU --- */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div className="relative md:col-span-1">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
@@ -195,21 +224,32 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
                 className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-10 pr-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <div className="flex gap-4">
+            <div className="md:col-span-2 flex gap-4">
               <select
                 value={searchField}
                 onChange={(e) => setSearchField(e.target.value)}
-                className="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="all">Cari di Semua</option>
                 <option value="filename">Nama File</option>
                 <option value="uploaded_by">Pengunggah</option>
                 <option value="tags">Tag</option>
               </select>
+              {/* --- DROPDOWN FILTER TAG BARU --- */}
+              <select
+                value={selectedTag}
+                onChange={(e) => setSelectedTag(e.target.value)}
+                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Semua Tag</option>
+                {allTags.map(tag => (
+                    <option key={tag} value={tag}>{tag}</option>
+                ))}
+              </select>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="newest">Terbaru</option>
                 <option value="oldest">Terlama</option>
@@ -224,7 +264,6 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
               <thead className="border-b border-gray-700">
                 <tr>
                   <th className="w-2/5 p-2 md:p-4 font-semibold text-gray-400">NAMA FILE & TAGS</th>
-                  {/* --- PERUBAHAN DI SINI: Judul kolom diubah --- */}
                   <th className="hidden sm:table-cell w-1/5 p-2 md:p-4 font-semibold text-gray-400">INFO</th>
                   <th className="w-2/5 p-2 md:p-4 font-semibold text-gray-400 text-center">AKSI</th>
                 </tr>
@@ -246,7 +285,6 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
                             ))}
                           </div>
                         </td>
-                        {/* --- PERUBAHAN DI SINI: Tampilkan semua info di satu kolom --- */}
                         <td className="hidden sm:table-cell p-2 md:p-4 text-gray-400">
                             <div>
                                 <span className="font-semibold text-white">{doc.uploaded_by}</span>
@@ -268,7 +306,7 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
                   })
                 ) : (
                   <tr><td colSpan={3} className="text-center p-8 text-gray-500">
-                    {searchTerm ? 'Tidak ada dokumen yang cocok dengan pencarian Anda.' : 'Belum ada dokumen.'}
+                    {searchTerm || selectedTag ? 'Tidak ada dokumen yang cocok.' : 'Belum ada dokumen.'}
                   </td></tr>
                 )}
               </tbody>

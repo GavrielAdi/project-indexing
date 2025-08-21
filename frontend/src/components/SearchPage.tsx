@@ -24,10 +24,9 @@ export default function SearchPage({ indexedFile, isLoading, setIsLoading, docum
   const [results, setResults] = useState<SearchResults>({ count: 0, snippets: [] });
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
-  
-  // --- PERBAIKAN DI SINI: Definisikan header di satu tempat ---
   const apiHeaders = { 'ngrok-skip-browser-warning': 'true' };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -38,12 +37,13 @@ export default function SearchPage({ indexedFile, isLoading, setIsLoading, docum
       setQuery(searchQuery);
     }
     if (!searchQuery) return;
+    
+    setHasSearched(true);
     setIsLoading(true);
     setSuggestions([]);
     setActiveIndex(-1);
     setResults({ count: 0, snippets: [] });
     try {
-      // Menambahkan header ke fetch
       const response = await fetch(`${API_URL}/search?query=${encodeURIComponent(searchQuery)}`, { headers: apiHeaders });
       const data = await response.json();
       setResults(data);
@@ -57,8 +57,7 @@ export default function SearchPage({ indexedFile, isLoading, setIsLoading, docum
     setActiveIndex(-1);
     if (newQuery.length > 1) {
       try {
-        // Menambahkan header ke fetch
-        const response = await fetch(`${API_URL}/autocomplete?prefix=${newQuery}`, { headers: apiHeaders });
+        const response = await fetch(`${API_URL}/autocomplete?prefix=${encodeURIComponent(newQuery)}`, { headers: apiHeaders });
         if (!response.ok) throw new Error("Network response was not ok");
         const data = await response.json();
         setSuggestions(data);
@@ -85,19 +84,19 @@ export default function SearchPage({ indexedFile, isLoading, setIsLoading, docum
   };
 
   return (
-    <div className="space-y-6 md:space-y-8">
-      {/* Dropdown File Aktif */}
-      <div className="bg-gray-800 p-4 rounded-lg shadow-md flex items-center gap-4">
-        <FiFileText className="text-xl md:text-2xl text-blue-400 flex-shrink-0" />
-        <div className="flex-grow min-w-0">
-          <label htmlFor="doc-select" className="text-xs md:text-sm text-gray-400">File Aktif Untuk Pencarian</label>
+    <div className="space-y-8 max-w-4xl mx-auto">
+      <div className="bg-gray-800 p-6 rounded-2xl shadow-lg space-y-6">
+        <div>
+          <label htmlFor="doc-select" className="text-sm font-medium text-gray-400 flex items-center gap-2 mb-2">
+            <FiFileText /> 1. Pilih Dokumen Aktif
+          </label>
           <div className="relative">
             <select
               id="doc-select"
               value={activeDocumentId || ''}
               onChange={(e) => onSwitchDocument(e.target.value)}
               disabled={isLoading || documents.length === 0}
-              className="w-full bg-transparent font-semibold text-white appearance-none focus:outline-none pr-8 truncate"
+              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white font-semibold appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {documents.length > 0 ? (
                 documents.map(doc => (
@@ -111,40 +110,53 @@ export default function SearchPage({ indexedFile, isLoading, setIsLoading, docum
                 </option>
               )}
             </select>
-            <FiChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <FiChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
+        </div>
+        <div className="relative">
+          <label htmlFor="search-input" className="text-sm font-medium text-gray-400 flex items-center gap-2 mb-2">
+            <FiSearch /> 2. Masukkan Frasa Pencarian
+          </label>
+          <form onSubmit={handleSearch} className="flex gap-2">
+            <input id="search-input" type="text" value={query} onChange={handleQueryChange} onKeyDown={handleKeyDown} placeholder="Ketik di sini..." disabled={isLoading || !activeDocumentId} className="flex-grow bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" />
+            <button type="submit" disabled={isLoading || !activeDocumentId} className="flex-shrink-0 flex justify-center items-center bg-blue-600 text-white font-bold p-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-500">
+              {isLoading ? <FiLoader className="animate-spin" /> : <FiSearch />}
+            </button>
+          </form>
+          {suggestions.length > 0 && (
+            <div className="absolute z-10 w-full mt-1 bg-gray-700 rounded-lg shadow-xl border border-gray-600 max-h-60 overflow-y-auto">
+              <ul>{suggestions.map((word, index) => (<li key={index} onClick={() => { setQuery(word); setSuggestions([]); }} className={`px-4 py-2 cursor-pointer transition-colors ${index === activeIndex ? 'bg-blue-500 text-white' : 'text-gray-300 hover:bg-gray-600'}`}>{word}</li>))}</ul>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Layout grid responsif */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 md:gap-8">
-        <div className="lg:col-span-2">
-          <div className="bg-gray-800 p-4 md:p-6 rounded-lg shadow-md">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2 text-white"><FiSearch /> Cari Frasa</h2>
-            <div className="relative">
-              <form onSubmit={handleSearch} className="flex gap-2">
-                <input type="text" value={query} onChange={handleQueryChange} onKeyDown={handleKeyDown} placeholder="Masukkan frasa..." disabled={isLoading || !activeDocumentId} className="flex-grow bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-600" />
-                <button type="submit" disabled={isLoading || !activeDocumentId} className="flex justify-center items-center bg-blue-600 text-white font-bold p-3 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-500">
-                  {isLoading ? <FiLoader className="animate-spin" /> : <FiSearch />}
-                </button>
-              </form>
-              {suggestions.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-gray-700 rounded-lg shadow-xl border border-gray-600 max-h-60 overflow-y-auto">
-                  <ul>{suggestions.map((word, index) => (<li key={index} onClick={() => { setQuery(word); setSuggestions([]); }} className={`px-4 py-2 cursor-pointer transition-colors ${index === activeIndex ? 'bg-blue-500 text-white' : 'text-gray-300 hover:bg-gray-600'}`}>{word}</li>))}</ul>
-                </div>
-              )}
-            </div>
+      <div className="bg-gray-800 p-6 rounded-2xl shadow-lg">
+        <h2 className="text-2xl font-bold text-white mb-4">Hasil Pencarian</h2>
+        {isLoading ? (
+          <div className="text-center py-8 text-gray-400">
+            <FiLoader className="animate-spin inline-block mr-2" /> Mencari...
           </div>
-        </div>
-        <div className="lg:col-span-3">
-          <div className="bg-gray-800 p-4 md:p-6 rounded-lg shadow-md h-full">
-            <h3 className="text-xl font-semibold mb-4 text-white">Hasil Pencarian</h3>
-            <p className="text-sm text-gray-400 mb-4">{results.count} hasil ditemukan</p>
-            <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
-              {results.snippets.map((snippet, index) => (<div key={index} dangerouslySetInnerHTML={{ __html: snippet.replace(/<strong>/g, '<strong class="bg-yellow-400 text-gray-900 font-bold px-1 rounded">') }} className="text-gray-300 border-l-4 border-blue-500 pl-4 py-2 text-justify" />))}
-            </div>
+        ) : !hasSearched ? (
+          <div className="text-center py-8 text-gray-500">
+            Hasil akan ditampilkan di sini setelah Anda melakukan pencarian.
           </div>
-        </div>
+        ) : (
+          <div>
+            <p className="text-sm text-gray-400 mb-4">{results.count} hasil ditemukan untuk kueri Anda.</p>
+            {results.count > 0 ? (
+              <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
+                {results.snippets.map((snippet, index) => (
+                  <div key={index} dangerouslySetInnerHTML={{ __html: snippet.replace(/<strong>/g, '<strong class="bg-yellow-400 text-gray-900 font-bold px-1 rounded">') }} className="text-gray-300 border-l-4 border-blue-500 pl-4 py-2 text-justify leading-relaxed" />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                Tidak ada hasil yang cocok ditemukan.
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

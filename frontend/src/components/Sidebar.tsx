@@ -1,10 +1,10 @@
 // file: frontend/src/components/Sidebar.tsx
-import { FiSearch, FiUpload, FiSettings, FiX } from 'react-icons/fi';
+import { FiHome, FiSearch, FiUpload, FiSettings, FiX } from 'react-icons/fi';
 
 interface SidebarProps {
   activePage: string;
   setActivePage: (page: string) => void;
-  onClose?: () => void; // Prop opsional untuk menutup sidebar
+  onClose?: () => void;
 }
 
 const NavItem = ({ icon, label, isActive, onClick }: any) => (
@@ -24,18 +24,22 @@ const NavItem = ({ icon, label, isActive, onClick }: any) => (
 export default function Sidebar({ activePage, setActivePage, onClose }: SidebarProps) {
   return (
     <aside className="w-64 bg-gray-800 p-4 flex flex-col gap-4 text-white h-full">
-      {/* Header dengan judul dan tombol tutup (hanya di mobile) */}
       <div className="flex justify-between items-center pt-2 pb-4">
         <h1 className="text-white text-2xl font-bold">
           DocuSearch
         </h1>
-        {/* Tombol tutup, hanya tampil di mobile (md:hidden) */}
         <button onClick={onClose} className="md:hidden p-1 text-gray-400 hover:text-white">
           <FiX size={24} />
         </button>
       </div>
 
       <nav className="flex flex-col gap-2">
+        <NavItem
+          icon={<FiHome size={20} />}
+          label="Beranda"
+          isActive={activePage === 'beranda'}
+          onClick={() => setActivePage('beranda')}
+        />
         <NavItem
           icon={<FiSearch size={20} />}
           label="Pencarian"

@@ -6,27 +6,28 @@ import Sidebar from '../components/Sidebar';
 import SearchPage from '../components/SearchPage';
 import UploadPage from '../components/UploadPage';
 import SettingsPage from '../components/SettingsPage';
+import BerandaPage from '../components/BerandaPage';
 import { FiMenu } from 'react-icons/fi';
 
-// --- PERUBAHAN DI SINI: Tambahkan uploaded_by dan tags ---
 export interface Document {
   id: string;
   filename: string;
   upload_date: string;
   uploaded_by: string;
   tags: string[];
-  last_modified_date: string; 
+  last_modified_date: string;
 }
 
 const LOCAL_STORAGE_KEY = 'lastActiveDocumentId';
 
 export default function HomePage() {
-  const [activePage, setActivePage] = useState('upload'); // Arahkan ke upload untuk melihat perubahan
+  const [activePage, setActivePage] = useState('beranda');
   const [documents, setDocuments] = useState<Document[]>([]);
   const [indexedFile, setIndexedFile] = useState('Memuat...');
   const [activeDocumentId, setActiveDocumentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [allTags, setAllTags] = useState<string[]>([]);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
   const apiHeaders = { 'ngrok-skip-browser-warning': 'true' };
@@ -37,6 +38,14 @@ export default function HomePage() {
       const data = await response.json();
       if (response.ok) setDocuments(data);
     } catch (err) { console.error("Error saat fetch riwayat:", err); }
+  };
+
+  const fetchAllTags = async () => {
+    try {
+        const response = await fetch(`${API_URL}/tags`, { headers: apiHeaders });
+        const data = await response.json();
+        if (response.ok) setAllTags(data);
+    } catch (err) { console.error("Error saat fetch tags:", err); }
   };
 
   const handleSwitchDocument = async (docId: string) => {
@@ -60,6 +69,7 @@ export default function HomePage() {
     const fetchInitialData = async () => {
       setIsLoading(true);
       await fetchDocuments();
+      await fetchAllTags();
       const lastActiveId = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (lastActiveId) {
         await handleSwitchDocument(lastActiveId);
@@ -80,13 +90,15 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    const activeDoc = documents.find(doc => doc.filename === indexedFile);
-    if (activeDoc) setActiveDocumentId(activeDoc.id);
-    else setActiveDocumentId(null);
-  }, [indexedFile, documents]);
+    const activeDoc = documents.find(doc => doc.id === activeDocumentId);
+    if (activeDoc) {
+      setIndexedFile(activeDoc.filename);
+    }
+  }, [activeDocumentId, documents]);
 
   const handleUploadSuccess = (newFileName: string) => {
     fetchDocuments();
+    fetchAllTags();
   };
 
   const resetActiveFile = () => {
@@ -125,6 +137,12 @@ export default function HomePage() {
             </div>
           </header>
           <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+            {activePage === 'beranda' && (
+              <BerandaPage 
+                documents={documents} 
+                setActivePage={setActivePage} 
+              />
+            )}
             {activePage === 'pencarian' && (
               <SearchPage
                 indexedFile={indexedFile}
