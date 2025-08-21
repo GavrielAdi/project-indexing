@@ -1,8 +1,8 @@
 // file: frontend/src/components/UploadPage.tsx
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { FiUpload, FiLoader, FiFileText, FiRefreshCw, FiCheckCircle, FiTrash2, FiActivity, FiEdit2, FiUser, FiTag, FiSearch } from 'react-icons/fi';
+import { useState, useMemo } from 'react';
+import { FiUpload, FiLoader, FiFileText, FiRefreshCw, FiCheckCircle, FiTrash2, FiActivity, FiEdit2, FiUser, FiTag, FiSearch, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { Document } from '../app/page';
 import EditModal from './EditModal';
 
@@ -16,6 +16,37 @@ interface UploadPageProps {
   fetchDocuments: () => void;
 }
 
+// Komponen baru untuk kontrol paginasi
+const PaginationControls = ({ currentPage, totalPages, onPageChange }: any) => {
+    const pageNumbers = [];
+    for (let i = 1; i <= totalPages; i++) {
+        pageNumbers.push(i);
+    }
+
+    return (
+        <div className="flex justify-center items-center gap-2 mt-4">
+            <button 
+                onClick={() => onPageChange(currentPage - 1)} 
+                disabled={currentPage === 1}
+                className="p-2 rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                <FiChevronLeft />
+            </button>
+            <span className="text-gray-400">
+                Halaman {currentPage} dari {totalPages}
+            </span>
+            <button 
+                onClick={() => onPageChange(currentPage + 1)} 
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                <FiChevronRight />
+            </button>
+        </div>
+    );
+};
+
+
 export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoading, indexedFile, resetActiveFile, documents, fetchDocuments }: UploadPageProps) {
   // State untuk form upload
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -28,62 +59,33 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [documentToEdit, setDocumentToEdit] = useState<Document | null>(null);
 
-  // --- State baru untuk filter dan sortir ---
+  // State untuk filter dan sortir
   const [searchTerm, setSearchTerm] = useState('');
   const [searchField, setSearchField] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
-  const [allTags, setAllTags] = useState<string[]>([]); // State baru untuk daftar semua tag
-  const [selectedTag, setSelectedTag] = useState(''); // State baru untuk tag yang dipilih
+  
+  // --- State baru untuk paginasi ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5; // Tampilkan 10 dokumen per halaman
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
   const apiHeaders = { 'ngrok-skip-browser-warning': 'true' };
-
-  // --- Fungsi baru untuk mengambil semua tag unik ---
-  const fetchAllTags = async () => {
-    try {
-        const response = await fetch(`${API_URL}/tags`, { headers: apiHeaders });
-        const data = await response.json();
-        if (response.ok) {
-            setAllTags(data);
-        } else {
-            console.error("Gagal mengambil daftar tag:", data.error);
-        }
-    } catch (err) {
-        console.error("Error saat fetch tags:", err);
-    }
-  };
-
-  // Ambil daftar tag saat komponen pertama kali dimuat
-  useEffect(() => {
-    fetchAllTags();
-  }, [documents]); // Jalankan juga setiap kali daftar dokumen berubah
 
   const handleOpenEditModal = (doc: Document) => {
     setDocumentToEdit(doc);
     setIsEditModalOpen(true);
   };
 
-  // --- Logika untuk memfilter dan menyortir dokumen ---
+  // Logika untuk memfilter dan menyortir dokumen
   const filteredAndSortedDocuments = useMemo(() => {
     let filtered = documents;
-
-    // 1. Filter berdasarkan tag yang dipilih
-    if (selectedTag) {
-        filtered = filtered.filter(doc => doc.tags.includes(selectedTag));
-    }
-
-    // 2. Filter berdasarkan kata kunci pencarian
     if (searchTerm) {
-        filtered = filtered.filter(doc => {
+        filtered = documents.filter(doc => {
             const term = searchTerm.toLowerCase();
             switch (searchField) {
-                case 'filename':
-                    return doc.filename.toLowerCase().includes(term);
-                case 'uploaded_by':
-                    return doc.uploaded_by.toLowerCase().includes(term);
-                case 'tags':
-                    return doc.tags.some(tag => tag.toLowerCase().includes(term));
-                case 'all':
+                case 'filename': return doc.filename.toLowerCase().includes(term);
+                case 'uploaded_by': return doc.uploaded_by.toLowerCase().includes(term);
+                case 'tags': return doc.tags.some(tag => tag.toLowerCase().includes(term));
                 default:
                     return doc.filename.toLowerCase().includes(term) ||
                            doc.uploaded_by.toLowerCase().includes(term) ||
@@ -91,20 +93,26 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
             }
         });
     }
-
-    // 3. Lakukan penyortiran
     switch (sortBy) {
-        case 'oldest':
-            return [...filtered].sort((a, b) => new Date(a.upload_date).getTime() - new Date(b.upload_date).getTime());
-        case 'az':
-            return [...filtered].sort((a, b) => a.filename.localeCompare(b.filename));
-        case 'za':
-            return [...filtered].sort((a, b) => b.filename.localeCompare(a.filename));
-        case 'newest':
-        default:
-            return [...filtered].sort((a, b) => new Date(b.last_modified_date).getTime() - new Date(a.last_modified_date).getTime());
+        case 'oldest': return [...filtered].sort((a, b) => new Date(a.upload_date).getTime() - new Date(b.upload_date).getTime());
+        case 'az': return [...filtered].sort((a, b) => a.filename.localeCompare(b.filename));
+        case 'za': return [...filtered].sort((a, b) => b.filename.localeCompare(a.filename));
+        default: return [...filtered].sort((a, b) => new Date(b.last_modified_date).getTime() - new Date(a.last_modified_date).getTime());
     }
-  }, [documents, searchTerm, sortBy, searchField, selectedTag]);
+  }, [documents, searchTerm, sortBy, searchField]);
+
+  // --- Logika baru untuk paginasi ---
+  const totalPages = Math.ceil(filteredAndSortedDocuments.length / itemsPerPage);
+  const paginatedDocuments = filteredAndSortedDocuments.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+  );
+
+  const handlePageChange = (page: number) => {
+      if (page >= 1 && page <= totalPages) {
+          setCurrentPage(page);
+      }
+  };
 
 
   const handleFileUpload = async (e: React.FormEvent) => {
@@ -211,46 +219,19 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
               <FiRefreshCw className={isLoading ? 'animate-spin' : ''} />
             </button>
           </div>
-
-          {/* --- PANEL FILTER DAN SORTIR BARU --- */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div className="relative md:col-span-1">
+          <div className="flex flex-col sm:flex-row gap-4 mb-4">
+            <div className="relative flex-grow">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Cari..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-10 pr-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <input type="text" placeholder="Cari..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-gray-700 border border-gray-600 rounded-lg pl-10 pr-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
-            <div className="md:col-span-2 flex gap-4">
-              <select
-                value={searchField}
-                onChange={(e) => setSearchField(e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
+            <div className="flex gap-4">
+              <select value={searchField} onChange={(e) => setSearchField(e.target.value)} className="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="all">Cari di Semua</option>
                 <option value="filename">Nama File</option>
                 <option value="uploaded_by">Pengunggah</option>
                 <option value="tags">Tag</option>
               </select>
-              {/* --- DROPDOWN FILTER TAG BARU --- */}
-              <select
-                value={selectedTag}
-                onChange={(e) => setSelectedTag(e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Semua Tag</option>
-                {allTags.map(tag => (
-                    <option key={tag} value={tag}>{tag}</option>
-                ))}
-              </select>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="newest">Terbaru</option>
                 <option value="oldest">Terlama</option>
                 <option value="az">Nama File (A-Z)</option>
@@ -258,7 +239,6 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
               </select>
             </div>
           </div>
-
           <div className="overflow-x-auto">
             <table className="w-full table-fixed text-left text-sm">
               <thead className="border-b border-gray-700">
@@ -271,8 +251,8 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
               <tbody>
                 {isLoading && documents.length === 0 ? (
                   <tr><td colSpan={3} className="text-center p-8 text-gray-500"><FiLoader className="animate-spin inline-block mr-2" /> Memuat...</td></tr>
-                ) : filteredAndSortedDocuments.length > 0 ? (
-                  filteredAndSortedDocuments.map((doc) => {
+                ) : paginatedDocuments.length > 0 ? (
+                  paginatedDocuments.map((doc) => {
                     const isActive = doc.filename === indexedFile;
                     return (
                       <tr key={doc.id} className={`border-b border-gray-700/50 transition-colors ${isActive ? 'bg-blue-900/50' : 'hover:bg-gray-700/50'}`}>
@@ -286,9 +266,7 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
                           </div>
                         </td>
                         <td className="hidden sm:table-cell p-2 md:p-4 text-gray-400">
-                            <div>
-                                <span className="font-semibold text-white">{doc.uploaded_by}</span>
-                            </div>
+                            <div><span className="font-semibold text-white">{doc.uploaded_by}</span></div>
                             <div className="text-xs mt-1">
                                 <div>Dibuat: {doc.upload_date}</div>
                                 <div>Diubah: {doc.last_modified_date}</div>
@@ -306,12 +284,20 @@ export default function UploadPage({ onUploadSuccess, onSwitchDocument, isLoadin
                   })
                 ) : (
                   <tr><td colSpan={3} className="text-center p-8 text-gray-500">
-                    {searchTerm || selectedTag ? 'Tidak ada dokumen yang cocok.' : 'Belum ada dokumen.'}
+                    {searchTerm ? 'Tidak ada dokumen yang cocok.' : 'Belum ada dokumen.'}
                   </td></tr>
                 )}
               </tbody>
             </table>
           </div>
+          {/* --- KONTROL PAGINASI BARU --- */}
+          {totalPages > 1 && (
+            <PaginationControls 
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+            />
+          )}
         </div>
       </div>
     </>
